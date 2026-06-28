@@ -1,0 +1,6 @@
+gradio==6.4.0
+llama-index
+llama-index-embeddings-ollama
+llama-index-llms-ollama
+pypdf
+python-dotenv
