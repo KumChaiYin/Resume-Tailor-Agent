@@ -2,3 +2,4 @@
 data/
 storage/
 __pycache__/
+local_testing/
