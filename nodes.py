@@ -88,47 +88,61 @@ def human_tuning_interrupt(state: AgentState) -> Dict[str, Any]:
     return {}
 
 
-def project_retriever(state: AgentState) -> Dict[str, Any]:
-    print("Executing Node project_retriever...")
+def component_pitcher(state: AgentState) -> Dict[str, Any]:
+    print("Executing Node component_pitcher...")
     return {
-        "retrieved_projects": [
+        "proposed_components": [
             {
-                "id": "project_001",
-                "title": "Backend Optimization Project",
-                "summary": "Reduced API latency by profiling bottlenecks and improving database access patterns.",
-                "matched_gaps": ["Distributed systems", "Cloud deployment"],
-            },
+                "component_id": "01", 
+                "title": "Distributed Web Crawler",
+                "summary": "Built a scalable crawler using Redis queue...",
+                "reason": "Addresses 'distributed systems' and 'backend scalability' mentioned in the JD's technical gaps.",
+                "target_skills_addressed": ["Redis", "Scalability", "System Design"], 
+                "source_file": "past-resumes/distributed_crawler.md",
+                "original_snippets": [
+                    "Engineered a distributed crawler handling 10k requests/sec",
+                    "Integrated Redis for job queuing"
+                ] 
+
+            }, 
             {
-                "id": "project_002",
-                "title": "Internal Automation Tool",
-                "summary": "Built a workflow tool used by multiple stakeholders to reduce manual reporting.",
-                "matched_gaps": ["Cross-functional communication"],
-            },
+                "component_id": "02", 
+                "title": "Teaching Assistant (Systems)",
+                "summary": "Led OS and Systems architecture recitations...",
+                "reason": "Demonstrates the technical communication and cross-functional leadership requested in JD soft skills.",
+                "source_file": "details/ta_systems.md",
+                "original_snippets": [
+                    "Mentored 50+ students in C++ and Linux kernel concepts",
+                    "Translated complex system architecture into clear documentation"
+                ] 
+            }
         ]
     }
 
 
 def human_approval_interrupt(state: AgentState) -> Dict[str, Any]:
     print("Executing Node human_approval_interrupt...")
-    approved_projects = state.get("approved_projects") or state["retrieved_projects"][:1]
-    return {
-        "approved_projects": approved_projects,
-    }
+    return {}
 
 
 def resume_strategist(state: AgentState) -> Dict[str, Any]:
     print("Executing Node resume_strategist...")
-    project_titles = ", ".join(project["title"] for project in state["approved_projects"])
+
+    approved = state.get("approved_components", [])
+    component_titles = ", ".join(c.get("title", "") for c in approved)
+    snippets = " | ".join([s for c in approved for s in c.get('original_snippets', [])])
 
     align_remarks = state.get('alignment_remarks', '') or 'None'
-    proj_remarks = state.get('project_remarks', '') or 'None'
+    comp_remarks = state.get('component_remarks', '') or 'None'
+    strategy = state.get('alignment_strategy', {})
     
     return {
         "final_draft": (
-            "Draft resume bullets:\n"
-            f"- Reframed approved experience around: {project_titles}.\n"
-            "- Emphasized backend impact, measurable outcomes, and JD-aligned terminology.\n"
-            f"- Alignment Remarks incorporated: {align_remarks}\n"
-            f"- Project Curation Remarks incorporated: {proj_remarks}"
+            "**Draft Resume Bullets:**\n\n"
+            f"**Curated Experiences:** {component_titles}\n"
+            f"**Original Snippets integrated:** {snippets}\n\n"
+            f"> *System Note: Addressed Technical Gaps ({', '.join(strategy.get('technical_gaps', []))}).*\n"
+            f"> *Alignment Remarks:* {align_remarks}\n"
+            f"> *Component Remarks:* {comp_remarks}"
         )
     }

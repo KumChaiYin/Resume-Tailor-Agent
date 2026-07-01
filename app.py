@@ -48,56 +48,61 @@ def submit_tuning(config, remarks):
     # Resume execution, it will pause before human_approval_interrupt
     graph.invoke(None, config)
     snapshot = graph.get_state(config)
+
     
-    retrieved_projects = snapshot.values.get("retrieved_projects", [])
+    proposed_components = snapshot.values.get("proposed_components", [])
     
     # Assemble options format for the CheckboxGroup
     # Construct markdown for display
-    details_md = "### 📂 Details of Retrieved Projects\n\n"
+    components_md = "### 📂 Proposed Components\n\n"
     choices = []
-    for p in retrieved_projects:
-        gaps_str = ", ".join(p.get("matched_gaps", []))
-        details_md += f"**{p['id']} - {p['title']}**\n"
-        details_md += f"> **Summary:** {p['summary']}  \n"
-        details_md += f"> **Matched Gaps:** {gaps_str}\n\n"
-        
-        choices.append(f"{p['id']} - {p['title']}")
+    
+    for c in proposed_components:
+        components_md += f"**{c['component_id']} - {c['title']}**\n"
+        components_md += f"> **Summary:** {c['summary']}  \n"
+        components_md += f"> **Reason:** {c['reason']}  \n"
+        components_md += f"> **Original Snippets:** \n"
+        for o in c.get('original_snippets', []):
+            components_md += f"> - {o}  \n"
+        components_md += "\n---\n"
+
+        choices.append(f"{c['component_id']} - {c['title']}")
     
     return (
         gr.update(interactive=False), # lock tuning remarks
         gr.update(visible=False),     # hide tuning submit button
         gr.update(visible=True),      # show Step 3
-        details_md,                   # populate project details Markdown
+        components_md,                   # populate project details Markdown
         gr.update(choices=choices, value=choices) # populate checkboxes
     )
 
 def submit_approval(config, selected_choices, remarks, jd_val, resume_val):
-    """Step 3: Approve projects. Transition to Step 4, output side-by-side view."""
+    """Step 3: Approve components. Transition to Step 4, output side-by-side view."""
     snapshot = graph.get_state(config)
-    retrieved_projects = snapshot.values.get("retrieved_projects", [])
+    proposed_components = snapshot.values.get("proposed_components", [])
     
-    # Extract approved projects based on user's Checkbox selection
-    approved_projects = []
+    # Extract approved components based on user's Checkbox selection
+    approved_components = []
     for choice in selected_choices:
         p_id = choice.split(" - ")[0]
-        for p in retrieved_projects:
-            if p["id"] == p_id:
-                approved_projects.append(p)
+        for p in proposed_components:
+            if p["component_id"] == p_id:
+                approved_components.append(p)
                 break
                 
     # Fallback: If nothing is selected, default to the first one
-    if not approved_projects and retrieved_projects:
-        approved_projects = retrieved_projects[:1]
+    if not approved_components and proposed_components:
+        approved_components = proposed_components[:1]
 
-    updates = {"approved_projects": approved_projects}
+    updates = {"approved_components": approved_components}
     if remarks.strip():
-        updates["project_remarks"] = remarks
+        updates["component_remarks"] = remarks
 
     # Update the state with user inputs
     graph.update_state(
         config,
         updates,
-        as_node="project_retriever"
+        as_node="human_approval_interrupt"
     )
     
     # Resume execution until the end
@@ -170,7 +175,6 @@ with gr.Blocks(title="AI Resume Tailor (Human-in-the-loop)") as demo:
     with gr.Column(visible=False) as step_2_col:
         gr.Markdown("---")
         gr.Markdown("### Step 2: Review Alignment Strategy")
-        # [UI UPDATE]: Applied the custom CSS class to limit the JSON window height and make it scrollable.
         strategy_json = gr.JSON(label="Generated Alignment Strategy", elem_classes="scrollable-json")
         tuning_remarks = gr.Textbox(lines=3, max_lines=3, label="Your Remarks for Tuning (Optional)", placeholder="e.g., Focus more on Cloud deployment...")
         btn_submit_tuning = gr.Button("Submit & Continue", variant="primary")
@@ -178,13 +182,11 @@ with gr.Blocks(title="AI Resume Tailor (Human-in-the-loop)") as demo:
     # [Step 3]
     with gr.Column(visible=False) as step_3_col:
         gr.Markdown("---")
-        gr.Markdown("### Step 3: Curate Retrieved Projects")
-        # Add Markdown to display project details (Summary and Matched Gaps)
-        projects_details_md = gr.Markdown()
-        # Clean Checkbox group for selection
-        projects_checkboxes = gr.CheckboxGroup(label="Select Projects to Include in Resume")
-        project_remarks = gr.Textbox(lines=3, max_lines=3, label="Final Curation Remarks (Optional)", placeholder="e.g., Keep bullets concise.")
-        btn_submit_approval = gr.Button("Approve Projects & Generate Draft", variant="primary")
+        gr.Markdown("### Step 3: Curate Proposed Components")
+        components_details_md = gr.Markdown()
+        components_checkboxes = gr.CheckboxGroup(label="Select Capability Components to Include")
+        component_remarks = gr.Textbox(lines=3, max_lines=3, label="Final Curation Remarks (Optional)", placeholder="e.g., Keep bullets concise, emphasize metrics.")
+        btn_submit_approval = gr.Button("Approve Components & Generate Draft", variant="primary")
 
     # [Step 4] 
     with gr.Column(visible=False) as step_4_col:
@@ -218,18 +220,17 @@ with gr.Blocks(title="AI Resume Tailor (Human-in-the-loop)") as demo:
         fn=submit_tuning,
         inputs=[session_config, tuning_remarks],
         outputs=[
-            tuning_remarks, btn_submit_tuning,                     # Controls Step 2
-            step_3_col, projects_details_md, projects_checkboxes   # Controls Step 3
+            tuning_remarks, btn_submit_tuning,                         # Controls Step 2
+            step_3_col, components_details_md, components_checkboxes   # Controls Step 3
         ]
     )
     
     btn_submit_approval.click(
         fn=submit_approval,
-        # Pass down JD and Resume values for comparison display in Step 4
-        inputs=[session_config, projects_checkboxes, project_remarks, jd_input, resume_input],
+        inputs=[session_config, components_checkboxes, component_remarks, jd_input, resume_input],
         outputs=[
-            projects_checkboxes, project_remarks, btn_submit_approval, # Controls Step 3
-            step_4_col, jd_display, resume_display, final_output       # Controls Step 4
+            components_checkboxes, component_remarks, btn_submit_approval, # Controls Step 3
+            step_4_col, jd_display, resume_display, final_output           # Controls Step 4
         ]
     )
     
@@ -239,7 +240,7 @@ with gr.Blocks(title="AI Resume Tailor (Human-in-the-loop)") as demo:
         outputs=[
             jd_input, resume_input, btn_start,
             step_2_col, strategy_json, tuning_remarks, btn_submit_tuning,
-            step_3_col, projects_details_md, projects_checkboxes, project_remarks, btn_submit_approval,
+            step_3_col, components_details_md, components_checkboxes, component_remarks, btn_submit_approval,
             step_4_col, jd_display, resume_display, final_output,
             session_config
         ]

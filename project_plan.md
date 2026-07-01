@@ -40,27 +40,28 @@ class AgentState(TypedDict):
 * **Action:** The workflow pauses, presenting the `alignment_strategy` to the user via Gradio. The user can manually tweak the strategy by adding comments. For example, they might specify: *"Tie the 'cross-functional communication' soft skill directly to my backend optimization project."*
 * **Output:** Updates `alignment_strategy` and appends any specific `alignment_remarks`.
 
-### Node 3: Project Retriever (`ReAct Agent`)
+### Node 3: Component Pitcher (`ReAct Agent`)
 
 * **Input:** `alignment_strategy`, `alignment_remarks`
-* **Action:** An autonomous ReAct loop equipped with a **RAG Tool** (accessing the user's career/project database).
-* The LLM analyzes the technical gaps and strategic needs.
-* It autonomously generates specific query strings to search the vector database.
-* It loops until it finds the best matching historical projects/experiences.
+* **Action:** An autonomous ReAct loop equipped with a **RAG Tool** accessing the career database. Instead of merely fetching raw projects, it performs **Capability Mapping**.
+* The LLM analyzes the technical gaps and strategic needs identified in Node 1.
+* It autonomously generates query strings to search the vector database for relevant experiences (e.g., framing a Teaching Assistant role as a technical communication component, or a Hack4Good win as agile problem-solving).
+* It loops and synthesizes the retrieved data to pitch how specific past experiences address the JD's requirements.
+* **Output (`proposed_components`):** A list of exactly 5 structured capability components. Each component includes `component_id`, `title`, `summary`, `reason` (how it aligns with the JD), `source_file`, and highly specific `original_snippets` for source grounding.
 
-* **Output (`retrieved_projects`):** A list of candidate projects fetched from the database.
-
-### Node 4: Human Interrupt II (Project Curation)
+### Node 4: Human Interrupt II (Component Curation)
 
 * **LangGraph Config:** `interrupt_before=["Resume_Strategist"]`
-* **Action:** The workflow pauses again. The user reviews the `retrieved_projects` surfaced by the RAG tool. The user acts as a filter, checking boxes to approve relevant projects and discarding irrelevant ones (e.g., removing a graphics rendering project when applying for a traditional backend role).
-* **Output:** Updates `approved_projects` and appends any final `project_remarks`.
+* **Action:** The workflow pauses, presenting the 5 `proposed_components` to the user via Gradio. The user acts as a strategic filter to review the pitched capabilities:
+* Approving or discarding specific components (e.g., rejecting a Technical Artist module focused on graphics rendering when tailoring the resume for a strictly Machine Learning Engineer role).
+* Adding manual refinements via an input box (e.g., "Shift the focus of this component from general leadership to specific cross-functional collaboration").
+* **Output:** Updates `approved_components` and appends any final `component_remarks`.
 
 ### Node 5: Resume Strategist (`Generator`)
 
-* **Input:** `jd_text`, `resume_text`, `approved_projects`, `alignment_remarks`, `alignment_strategy`, `project_remarks`
-* **Action:** Synthesizes all approved data. Drafts highly tailored resume bullet points using the exact terminology from the JD. Ensures the tone is professional and directly addresses the initial gaps.
-* **Output (`final_draft`):** The final actionable advice and ready-to-copy resume bullet points.
+* **Input:** `jd_text`, `resume_text`, `approved_components`, `component_remarks`, `alignment_remarks`, `alignment_strategy`
+* **Action:** Synthesizes all approved data. Acts as a precision copywriter to draft highly tailored resume bullet points using the exact terminology from the JD. It uses the `original_snippets` passed from Node 3 as a strict generation constraint—ensuring that all metrics, technical details, and past contributions are faithfully represented without hallucination.
+* **Output (`final_draft`):** The final actionable advice and ready-to-copy, high-fidelity resume bullet points.
 
 ---
 
@@ -69,8 +70,8 @@ class AgentState(TypedDict):
 ```text
 START 
   -> alignment_strategist 
-  -> human_tuning_interrupt 
-  -> project_retriever (ReAct) 
+  -> human_tuning_interrupt
+  -> component pitcher (ReAct)
   -> human_approval_interrupt 
   -> resume_strategist 
   -> END
