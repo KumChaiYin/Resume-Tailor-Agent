@@ -24,11 +24,17 @@ def build_index():
         print("The 'data' folder was missing. I created it. Please put your files in ./data and run again.")
         return
 
-    documents = SimpleDirectoryReader("./data").load_data()
+    documents = SimpleDirectoryReader("./data", recursive=True).load_data()
     
     if not documents:
         print("No documents found in /data. Add some .md or .pdf files first!")
         return
+    
+    for doc in documents:
+        if "past_resumes" in doc.metadata["file_path"]:
+            doc.metadata["document_type"] = "resume history"
+        elif "details" in doc.metadata["file_path"]:
+            doc.metadata["document_type"] = "specific details"
 
     print(f"Loaded {len(documents)} documents from /data")
     print(f"Using Ollama embedding model: {OLLAMA_EMBED_MODEL}")
